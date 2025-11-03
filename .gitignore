@@ -1,0 +1,9 @@
+node_modules/
+npm-debug.log
+package-lock.json
+.env
+.DS_Store
+/.vscode/
+/.idea/
+node_modules
+public/library_management.code-workspace
