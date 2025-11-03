@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search Book - Library Management System</title>
+    <link rel="stylesheet" href="/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <nav>
+        <ul>
+            <li><a href="/">Login</a></li>
+            <li><a href="/register">Register</a></li>
+            <li><a href="/add_book">Add Book</a></li>
+            <li><a href="/search_book">Search Book</a></li>
+            <li><a href="/view_books">View Books</a></li>
+        </ul>
+    </nav>
+    <main>
+        <div class="container">
+            <h2>Search Book</h2>
+            <form action="/view_books" method="GET" onsubmit="return validateForm()">
+                <div class="form-group">
+                    <label for="query">Search by Title or Author:</label>
+                    <input type="text" id="query" name="query" required>
+                </div>
+                <button type="submit">Search</button>
+            </form>
+        </div>
+    </main>
+    <footer>
+        <p>Library Management System © 2025</p>
+    </footer>
+    <script>
+        function validateForm() {
+            const queryInput = document.getElementById('query');
+            queryInput.value = queryInput.value.trim();
+            if (!queryInput.value) {
+                alert('Search term cannot be empty.');
+                return false;
+            }
+            return true;
+        }
+    </script>
+</body>
+</html>

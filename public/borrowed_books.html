@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Borrowed Books - Library Management System</title>
+    <link rel="stylesheet" href="/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        /* Loading spinner styles */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            color: #007bff;
+            font-style: italic;
+        }
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid #007bff;
+            border-top: 2px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <ul>
+            <li><a href="/"><i class="fas fa-sign-in-alt" style="margin-right: 5px;"></i> Login</a></li>
+            <li><a href="/register"><i class="fas fa-user-plus" style="margin-right: 5px;"></i> Register</a></li>
+            <li><a href="/add_book"><i class="fas fa-book" style="margin-right: 5px;"></i> Add Book</a></li>
+            <li><a href="/search_book"><i class="fas fa-search" style="margin-right: 5px;"></i> Search Book</a></li>
+            <li><a href="/view_books"><i class="fas fa-list" style="margin-right: 5px;"></i> View Books</a></li>
+            <li><a href="/borrowed_books" class="active"><i class="fas fa-book-reader" style="margin-right: 5px;"></i> Borrowed Books</a></li>
+            <li><a href="/borrow_book"><i class="fas fa-book" style="margin-right: 5px;"></i> Borrow Book</a></li>
+        </ul>
+    </nav>
+    <main>
+        <div class="container">
+            <h2>Borrowed Books</h2>
+            <div class="error" id="error" style="display: none;"></div>
+            <!-- Table to display borrowed books -->
+            <div class="table-container">
+                <div style="margin-bottom: 10px;">
+                    <button onclick="fetchBorrowedBooks()"><i class="fas fa-sync-alt" style="margin-right: 5px;"></i> Refresh List</button>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Title</th>
+                            <th>Borrower</th>
+                            <th>Borrow Date</th>
+                            <th>Due Date</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="borrowedBooksTable">
+                        <tr><td colspan="6" class="loading"><span class="spinner"></span> Loading borrowed books...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+    <footer>
+        <p>Library Management System © 2025</p>
+    </footer>
+    <script>
+        // Utility to format current timestamp for logging
+        function getTimestamp() {
+            const now = new Date();
+            return now.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+        }
+
+        // Utility to format date strings
+        function formatDate(dateStr) {
+            if (!dateStr) return 'N/A';
+            const date = new Date(dateStr);
+            if (isNaN(date.getTime())) return 'Invalid Date';
+            return date.toLocaleDateString('en-US', { timeZone: 'Asia/Kolkata' });
+        }
+
+        // Fetch and display borrowed books
+        async function fetchBorrowedBooks() {
+            const tbody = document.getElementById('borrowedBooksTable');
+            try {
+                tbody.innerHTML = '<tr><td colspan="6" class="loading"><span class="spinner"></span> Loading borrowed books...</td></tr>';
+                console.log(`[${getTimestamp()}] Fetching borrowed books from /api/borrowed_books...`);
+                const response = await fetch('/api/borrowed_books');
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP error! Status: ${response.status}, Response: ${errorText}`);
+                }
+                const books = await response.json();
+                console.log(`[${getTimestamp()}] Fetched borrowed books:`, books);
+                tbody.innerHTML = '';
+                if (books.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6">No borrowed books found.</td></tr>';
+                    return;
+                }
+                books.forEach(book => {
+                    if (!book.borrow_id || !book.title || !book.username || !book.borrow_date || !book.due_date) {
+                        console.warn(`[${getTimestamp()}] Skipping invalid borrowed book entry:`, book);
+                        return;
+                    }
+                    const tr = document.createElement('tr');
+                    const isOverdue = new Date(book.due_date) < new Date() && !book.returned;
+                    tr.className = isOverdue ? 'overdue' : '';
+                    tr.innerHTML = `
+                        <td>${book.title || 'N/A'}</td>
+                        <td>${book.username || 'N/A'}</td>
+                        <td>${formatDate(book.borrow_date)}</td>
+                        <td>${formatDate(book.due_date)}</td>
+                        <td>${book.returned ? 'Returned' : 'Borrowed'}</td>
+                        <td>
+                            ${!book.returned ? `<button onclick="returnBook(${book.borrow_id})"><i class="fas fa-undo" style="margin-right: 5px;"></i> Return</button>` : ''}
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (err) {
+                console.error(`[${getTimestamp()}] Fetch borrowed books error:`, err);
+                tbody.innerHTML = '<tr><td colspan="6">Failed to load borrowed books. Please check your connection or server status.</td></tr>';
+                showError('Failed to load borrowed books: ' + err.message);
+            }
+        }
+
+        // Handle book return
+        async function returnBook(borrow_id) {
+            try {
+                console.log(`[${getTimestamp()}] Returning book with borrow_id:`, borrow_id);
+                const response = await fetch(`/api/borrowed_books/return/${borrow_id}`, { method: 'POST' });
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to return book');
+                }
+                const result = await response.json();
+                showError(result.message || 'Book returned successfully!');
+                fetchBorrowedBooks();
+            } catch (err) {
+                console.error(`[${getTimestamp()}] Return book error:`, err);
+                showError('Error returning book: ' + err.message);
+            }
+        }
+
+        // Show error message
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            setTimeout(() => { errorDiv.style.display = 'none'; }, 3000);
+        }
+
+        // Load data on page load
+        fetchBorrowedBooks();
+    </script>
+</body>
+</html>

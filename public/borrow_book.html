@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Borrow a Book - Library Management System</title>
+    <link rel="stylesheet" href="/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        /* Loading spinner styles */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            color: #007bff;
+            font-style: italic;
+        }
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid #007bff;
+            border-top: 2px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <ul>
+            <li><a href="/"><i class="fas fa-sign-in-alt" style="margin-right: 5px;"></i> Login</a></li>
+            <li><a href="/register"><i class="fas fa-user-plus" style="margin-right: 5px;"></i> Register</a></li>
+            <li><a href="/add_book"><i class="fas fa-book" style="margin-right: 5px;"></i> Add Book</a></li>
+            <li><a href="/search_book"><i class="fas fa-search" style="margin-right: 5px;"></i> Search Book</a></li>
+            <li><a href="/view_books"><i class="fas fa-list" style="margin-right: 5px;"></i> View Books</a></li>
+            <li><a href="/borrowed_books"><i class="fas fa-book-reader" style="margin-right: 5px;"></i> Borrowed Books</a></li>
+            <li><a href="/borrow_book" class="active"><i class="fas fa-book" style="margin-right: 5px;"></i> Borrow Book</a></li>
+        </ul>
+    </nav>
+    <main>
+        <div class="container">
+            <h2>Borrow a Book</h2>
+            <div class="error" id="error" style="display: none;"></div>
+            <!-- Form to borrow a book -->
+            <form id="borrowForm" action="/api/borrowed_books" method="POST" aria-label="Borrow book form">
+                <div class="form-group">
+                    <label for="username">Username:</label>
+                    <input type="text" id="username" name="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="book_id">Book:</label>
+                    <select id="book_id" name="book_id" required>
+                        <option value="" disabled selected>Loading books...</option>
+                    </select>
+                    <button type="button" onclick="fetchAvailableBooks()" style="margin-top: 10px; width: auto; padding: 8px 12px;">
+                        <i class="fas fa-sync-alt" style="margin-right: 5px;"></i> Retry
+                    </button>
+                </div>
+                <button type="submit"><i class="fas fa-book" style="margin-right: 5px;"></i> Borrow Book</button>
+            </form>
+        </div>
+    </main>
+    <footer>
+        <p>Library Management System © 2025</p>
+    </footer>
+    <script>
+        // Utility to format current timestamp for logging
+        function getTimestamp() {
+            const now = new Date();
+            return now.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+        }
+
+        // Fetch available books for dropdown
+        async function fetchAvailableBooks() {
+            const select = document.getElementById('book_id');
+            try {
+                select.innerHTML = '<option value="" disabled selected class="loading"><span class="spinner"></span> Loading books...</option>';
+                console.log(`[${getTimestamp()}] Fetching available books from /api/books/available...`);
+                const response = await fetch('/api/books/available');
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP error! Status: ${response.status}, Response: ${errorText}`);
+                }
+                const books = await response.json();
+                console.log(`[${getTimestamp()}] Available books:`, books);
+                select.innerHTML = '<option value="" disabled selected>Select a book</option>';
+                if (books.length === 0) {
+                    const option = document.createElement('option');
+                    option.textContent = 'No books available';
+                    option.disabled = true;
+                    select.appendChild(option);
+                    return;
+                }
+                books.forEach(book => {
+                    if (!book.book_id || !book.title || !book.author || !book.isbn) {
+                        console.warn(`[${getTimestamp()}] Skipping invalid book entry:`, book);
+                        return;
+                    }
+                    console.log(`[${getTimestamp()}] Adding book to dropdown:`, book);
+                    const option = document.createElement('option');
+                    option.value = book.book_id;
+                    option.textContent = `${book.title} by ${book.author} (ISBN: ${book.isbn})`;
+                    select.appendChild(option);
+                });
+            } catch (err) {
+                console.error(`[${getTimestamp()}] Fetch available books error:`, err);
+                select.innerHTML = '<option value="" disabled selected>Failed to load books. Check server status.</option>';
+                showError('Failed to load available books: ' + err.message);
+            }
+        }
+
+        // Show error message
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            setTimeout(() => { errorDiv.style.display = 'none'; }, 3000);
+        }
+
+        // Handle form submission
+        document.getElementById('borrowForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const form = e.target;
+            const button = form.querySelector('button[type="submit"]');
+            button.disabled = true;
+            button.textContent = 'Borrowing...';
+            try {
+                console.log(`[${getTimestamp()}] Submitting borrow request:`, {
+                    book_id: form.book_id.value,
+                    username: form.username.value
+                });
+                const response = await fetch(form.action, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        book_id: form.book_id.value,
+                        username: form.username.value
+                    })
+                });
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to borrow book');
+                }
+                const result = await response.json();
+                showError(result.message || 'Book borrowed successfully! Redirecting...');
+                setTimeout(() => {
+                    window.location.href = '/borrowed_books';
+                }, 1500);
+            } catch (err) {
+                console.error(`[${getTimestamp()}] Borrow book error:`, err);
+                showError('Error borrowing book: ' + err.message);
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Borrow Book';
+            }
+        });
+
+        // Load data on page load
+        fetchAvailableBooks();
+    </script>
+</body>
+</html>
